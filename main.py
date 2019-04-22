@@ -8,39 +8,116 @@ from pprint import pprint
 from matplotlib import pyplot as plt
 
 
-def activation_function(a, h):
-    # the first function is a soft implementation of relu..named softplus
-    if h == 1:
-        return np.log(1 + np.exp(a))
-    # the second activation function is tanh
-    elif h == 2:
-        term1 = np.exp(a) - np.exp(-a)
-        term2 = np.exp(a) + np.exp(-a)
-        return term1 / term2
-    else:
-        # the third activation function is a cos.
-        return np.cos(a)
+def softplus(a):
+    return np.log(1 + np.exp(a))
 
 
-def forward():
+def tanh(a):
+    term1 = np.exp(a) - np.exp(-a)
+    term2 = np.exp(a) + np.exp(-a)
+    return term1 / term2
+
+
+def cos(a):
+    return np.cos(a)
+
+
+def derivative_softplus(a):
     pass
 
 
-def backward():
+def derivative_tanh(a):
     pass
 
+
+def derivative_cos(a):
+    pass
+
+
+def activation_function(a):
+    return non_linearity(a)
+
+
+def derivative_activation_function(a):
+    pass
+
+
+def get_hidden_layer_representation(input, weights_1):
+    # TODO add the bias (1)
+    # input : batch_size x D , weights_1 : M x D
+
+    a = input.dot(weights_1.T)
+
+    a = activation_function(a)
+
+    # TODO add the bias to a. Dimensions right now: batch_size x M
+    return a
+
+
+def forward(input, weights_1, weights_2):
+    # TODO add BIAS
+    # pass the input through the hidden layer
+    hidden_layer_representation = get_hidden_layer_representation(input, weights_1)
+
+    # calculate dot product between weights_2 and hidden layer representation
+    # hidden layer_representation : B x M
+    # weights_2 : M x K
+    output = hidden_layer_representation.dot(weights_2.T)
+
+    # output now has dimensions: batch_size x K
+    output = softmax(output)
+
+    return output, hidden_layer_representation, weights_1, weights_2
+
+
+def backward(labels, output, hidden_layer_rep, weights_1, weights_2, lamda):
+
+    # gradients for the weights between the hidden layer and the softmax layer
+    grad_weights_2 = (labels - output).T.dot(hidden_layer_rep) - lamda * weights_2
+    
 
 # not vectorized...it will be used for comparison with the vectorized version
-def loss(N, K, t, y, lamb, weights):
+def get_loss(batch_size, classes, labels, output, lamda, weights):
     # first calculate the norm
-    regularization = (-1.0 * lamb / 2) * (np.power(np.linalg.norm(weights), 2))
+    regularization = (lamda / 2) * (np.power(np.linalg.norm(weights), 2))
     sum = 0
-    for n in range(1, N+1):
-        for k in range(1, K+1):
-            sum += t[n, k]*np.log(y[n,k])
+    for n in range(0, batch_size):
+        for k in range(0, classes):
+            sum += labels[n, k] * np.log(output[n, k])
+
+    return sum - regularization
 
 
-def softmax():
+# vectorized version of the loss function
+def get_loss_vectorized(labels, output, lamda, weights):
+    regularization = (lamda / 2) * (np.power(np.linalg.norm(weights), 2))
+    output = np.log(output)
+    output = labels * output
+    output = np.sum(output, 1)
+    output = np.sum(output, 0)
+    loss = output - regularization
+    return loss
+
+
+def softmax(a):
+    # this version of softmax is more numerical stable
+    s = np.max(a, axis=1)
+    s = np.expand_dims(s, 1)  # unsqueeze
+    e_x = np.exp(a - s)
+    div = np.sum(e_x, axis=1)
+    div = np.expand_dims(div, 1)  # unsqueeze
+    return e_x / div
+
+
+def batch_yielder(batch_size=128):
+    pass
+
+
+def train():
+    pass
+
+
+def test():
     pass
 
 
@@ -90,4 +167,25 @@ def load_cifar_10_data():
     pass
 
 
-load_mnist_data('/home/sotiris/PycharmProjects/mnist_data/')
+# load_mnist_data('/home/sotiris/PycharmProjects/mnist_data/')
+non_linearity = cos
+# input = np.array([[1, 2, 3, 6],
+#                   [2, 4, 5, 6],
+#                   [1, 2, 3, 6]])
+# print(input)
+# print(input.shape)
+# input = np.array([13, 46, 79])
+# print(softmax(input))
+# activation_function(1.2)
+# labels = np.array([[0, 0, 0, 1, 0], [0, 0, 0, 0, 1]])
+# output = np.array([[0.05, 0.05, 0.05, 0.8, 0.05], [0.05, 0.05, 0.05, 0.8, 0.05]])
+# weights1 = np.array([[1, 2, 3, 4, 5],
+#                      [1, 2, 3, 4, 5]])
+#
+# weights2 = np.array([[6, 7, 8, 9, 10],
+#                      [1, 2, 3, 4, 5]])
+# weights = np.concatenate((weights1, weights2))
+# print(weights.flatten())
+# print(get_loss(1, 5, labels, output))
+# print(get_loss_vectorized(labels, output, 0.1, weights))
+
