@@ -107,9 +107,7 @@ def backward(labels, output, hidden_layer_rep, weights_1, weights_2, input):
 
     derivative_result = derivative_activation_function(input.dot(weights_1.T))
 
-    grad_weights_1_tmp = (labels - output).dot(weights_2)
-
-    grad_weights_1_tmp = grad_weights_1_tmp * derivative_result
+    grad_weights_1_tmp = (labels - output).dot(weights_2) * derivative_result
 
     grad_weights_1 = grad_weights_1_tmp.T.dot(input) - lamda * weights_1
 
@@ -162,12 +160,12 @@ def train():
     # weights_2 will be initialized to zeros or xavier
     weights_1 = np.random.rand(M, D)*np.sqrt(1/(D + M))
 
-    weights_2 = np.zeros((K, M))
-    # weights_2 = np.random.rand(K, M)*np.sqrt(1/(M + K))
+    # weights_2 = np.zeros((K, M))
+    weights_2 = np.random.rand(K, M)*np.sqrt(1/(M + K))
 
-    for epoch in range(epochs):
+    for _ in tqdm(range(epochs)):
         epoch_loss = []
-        iterator = tqdm(batch_yielder(train_data, train_labels))
+        iterator = batch_yielder(train_data, train_labels)
         for batch in iterator:
             ### prepare data
             input_data = batch[0]
@@ -198,17 +196,93 @@ def train():
 def test():
     # we do forward passes with the learned weights and we predict
     iterator = tqdm(batch_yielder(test_data, test_labels))
+    true = 0
+    total = 0
     for batch in tqdm(iterator):
         input_data = batch[0]
         labels = batch[1]
 
         ### forward
         output = inference(input_data, learned_weights_1, learned_weights_2)
+        predictions = np.argmax(output, 1)
+        labels = np.argmax(labels, 1)
+
+        for idx in range(labels.shape[0]):
+            if predictions[idx] == labels[idx]:
+                true += 1
+            total += 1
+
+    print(true)
+    print(total)
+    print("Accuracy : {}/{} ... {}".format(true, total, float(true/total)))
 
 
 def show_image(image_data):
     plt.imshow(image_data.reshape(28, 28), interpolation='nearest')
     plt.show()
+
+
+def gradient_check():
+    epsilon = 1e-6
+
+    # create two random weight matrices
+    weights_1_tmp = np.random.rand(M, D)*np.sqrt(1/(D + M))
+    weights_2_tmp = np.random.rand(K, M)*np.sqrt(1/(M + K))
+
+    # create a fake train batch (of size 8)
+    b_size = 8
+    fake_input = train_data[:b_size]
+    fake_labels = train_labels[:b_size]
+
+    # calculate gradients with backpropagation
+    loss, output, hidden_layer_output = forward(fake_input, fake_labels, weights_1_tmp, weights_2_tmp)
+    grad_weights_1, grad_weights_2 = backward(fake_labels,
+                                              output,
+                                              hidden_layer_output,
+                                              weights_1_tmp,
+                                              weights_2_tmp,
+                                              fake_input)
+
+    # calculate gradients with two-sided epsilon method
+    grad_check_for_w1 = np.zeros((M, D))
+    for i in range(grad_check_for_w1.shape[0]):
+        for j in range(grad_check_for_w1.shape[1]):
+            w1 = np.copy(weights_1_tmp)
+            w1[i, j] += epsilon
+            e1, _, _ = forward(fake_input, fake_labels, w1, weights_2_tmp)
+
+            w1 = np.copy(weights_1_tmp)
+            w1[i, j] -= epsilon
+            e2, _, _ = forward(fake_input, fake_labels, w1, weights_2_tmp)
+
+            grad_check_for_w1[i, j] = (e1 - e2) / (2 * epsilon)
+
+    # compute the difference for w1
+    # it is the Euclidean distance normalized by the sum of the norms
+    numerator = np.linalg.norm(grad_weights_1 - grad_check_for_w1)
+    denominator = np.linalg.norm(grad_check_for_w1) + np.linalg.norm(grad_weights_1)
+    difference = numerator / denominator
+    print('The difference for weights_1 is: {}'.format(difference))
+
+    grad_check_for_w2 = np.zeros((K, M))
+    for i in range(grad_check_for_w2.shape[0]):
+        for j in range(grad_check_for_w2.shape[1]):
+            w2 = np.copy(weights_2_tmp)
+            w2[i, j] += epsilon
+            e1, _, _ = forward(fake_input, fake_labels, weights_1_tmp, w2)
+
+            w2 = np.copy(weights_2_tmp)
+            w2[i, j] -= epsilon
+            e2, _, _ = forward(fake_input, fake_labels, weights_1_tmp, w2)
+
+            grad_check_for_w2[i, j] = (e1 - e2) / (2 * epsilon)
+
+    # compute the difference for w2
+    # it is the Euclidean distance normalized by the sum of the norms
+    numerator = np.linalg.norm(grad_weights_2 - grad_check_for_w2)
+    denominator = np.linalg.norm(grad_check_for_w2) + np.linalg.norm(grad_weights_2)
+    difference = numerator / denominator
+    print('The difference for weights_2 is: {}'.format(difference))
 
 
 # a function to load the mnist data
@@ -260,7 +334,7 @@ def load_cifar_10_data():
 ###### MODEL PARAMETERS ######
 
 batch_size = 120
-epochs = 10
+epochs = 100
 lr = 0.001
 lamda = 0.01
 M = 100
@@ -303,11 +377,12 @@ shuffle(idx_list)
 test_data = test_data[idx_list]
 test_labels = test_labels[idx_list]
 
+gradient_check()
 learned_weights_1, learned_weights_2 = train()
 ###################
 
 ###### EVALUATE ######
-# test()
+test()
 ######################
 
 
