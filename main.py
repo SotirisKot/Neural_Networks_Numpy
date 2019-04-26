@@ -1,7 +1,6 @@
 from random import shuffle
 import numpy as np
 import matplotlib.pyplot as plt
-import time
 from tqdm import tqdm
 import pickle
 import random
@@ -49,15 +48,18 @@ def derivative_activation_function(a):
 
 
 def get_hidden_layer_representation(input, weights_1):
-    # TODO add the bias (1)
-    # input : batch_size x D , weights_1 : M x D
 
+    # input : batch_size x (D + 1) , weights_1 : M x (D + 1)
     a = input.dot(weights_1.T)
 
     a = activation_function(a)
 
-    # TODO add the bias to a. Dimensions right now: batch_size x M
-    return a
+    # add the bias to a. Dimensions right now: batch_size x M
+    # adding the bias the new dimensions will be : batch_size x (M + 1)
+    a_final = np.ones((a.shape[0], a.shape[1] + 1), dtype=float)
+    a_final[:, 1:] = a
+
+    return a_final
 
 
 def forward(input, labels, weights_1, weights_2):
@@ -66,8 +68,8 @@ def forward(input, labels, weights_1, weights_2):
     hidden_layer_representation = get_hidden_layer_representation(input, weights_1)
 
     # calculate dot product between weights_2 and hidden layer representation
-    # hidden layer_representation : B x M
-    # weights_2 : M x K
+    # hidden layer_representation : B x (M + 1)
+    # weights_2 : K x (M + 1)
     output = hidden_layer_representation.dot(weights_2.T)
 
     # output now has dimensions: batch_size x K
@@ -87,8 +89,8 @@ def inference(input, weights_1, weights_2):
     hidden_layer_representation = get_hidden_layer_representation(input, weights_1)
 
     # calculate dot product between weights_2 and hidden layer representation
-    # hidden layer_representation : B x M
-    # weights_2 : M x K
+    # hidden layer_representation : B x (M + 1)
+    # weights_2 : K x (M + 1)
     output = hidden_layer_representation.dot(weights_2.T)
 
     # output now has dimensions: batch_size x K
@@ -102,12 +104,12 @@ def backward(labels, output, hidden_layer_rep, weights_1, weights_2, input):
     # gradients for the weights between the hidden layer and the softmax layer
     grad_weights_2 = (labels - output).T.dot(hidden_layer_rep) - lamda * weights_2
 
-    # TODO remove the bias from weights_2
-    # weights_2_temp = np.copy(weights_2[:, 1:])
+    # remove the bias from weights_2
+    weights_2_temp = np.copy(weights_2[:, 1:])
 
     derivative_result = derivative_activation_function(input.dot(weights_1.T))
 
-    grad_weights_1_tmp = (labels - output).dot(weights_2) * derivative_result
+    grad_weights_1_tmp = (labels - output).dot(weights_2_temp) * derivative_result
 
     grad_weights_1 = grad_weights_1_tmp.T.dot(input) - lamda * weights_1
 
@@ -158,10 +160,12 @@ def train():
     # initialize the weights
     # for weights_1 we will use xavier initialization
     # weights_2 will be initialized to zeros or xavier
-    weights_1 = np.random.rand(M, D)*np.sqrt(1/(D + M))
+    weights_1 = np.random.rand(M, D + 1)*np.sqrt(1/(D + 1 + M))
+    weights_1[:, 0] = 1.0
 
-    # weights_2 = np.zeros((K, M))
-    weights_2 = np.random.rand(K, M)*np.sqrt(1/(M + K))
+    # weights_2 = np.zeros((K, M+1))
+    weights_2 = np.random.rand(K, M + 1)*np.sqrt(1/(M + 1 + K))
+    weights_2[:, 0] = 1.0
 
     for _ in tqdm(range(epochs)):
         epoch_loss = []
@@ -226,8 +230,11 @@ def gradient_check():
     epsilon = 1e-6
 
     # create two random weight matrices
-    weights_1_tmp = np.random.rand(M, D)*np.sqrt(1/(D + M))
-    weights_2_tmp = np.random.rand(K, M)*np.sqrt(1/(M + K))
+    weights_1_tmp = np.random.rand(M, D + 1)*np.sqrt(1/(D + 1 + M))
+    weights_2_tmp = np.random.rand(K, M + 1)*np.sqrt(1/(M + 1 + K))
+
+    weights_1_tmp[:, 0] = 1.0
+    weights_2_tmp[:, 0] = 1.0
 
     # create a fake train batch (of size 8)
     b_size = 8
@@ -244,7 +251,7 @@ def gradient_check():
                                               fake_input)
 
     # calculate gradients with two-sided epsilon method
-    grad_check_for_w1 = np.zeros((M, D))
+    grad_check_for_w1 = np.zeros((M, D + 1))
     for i in range(grad_check_for_w1.shape[0]):
         for j in range(grad_check_for_w1.shape[1]):
             w1 = np.copy(weights_1_tmp)
@@ -264,7 +271,7 @@ def gradient_check():
     difference = numerator / denominator
     print('The difference for weights_1 is: {}'.format(difference))
 
-    grad_check_for_w2 = np.zeros((K, M))
+    grad_check_for_w2 = np.zeros((K, M + 1))
     for i in range(grad_check_for_w2.shape[0]):
         for j in range(grad_check_for_w2.shape[1]):
             w2 = np.copy(weights_2_tmp)
@@ -333,11 +340,11 @@ def load_cifar_10_data():
 
 ###### MODEL PARAMETERS ######
 
-batch_size = 120
-epochs = 100
+batch_size = 100
+epochs = 200
 lr = 0.001
 lamda = 0.01
-M = 100
+M = 300
 D = 784
 K = 10
 non_linearity = tanh
@@ -358,8 +365,13 @@ else:
 
 ###### CREATE SPLITS ######
 
-train_data, train_labels, test_data, test_labels = load_mnist_data()
+train_data_old, train_labels, test_data_old, test_labels = load_mnist_data()
 
+train_data = np.ones((train_data_old.shape[0], train_data_old.shape[1] + 1), dtype=float)
+train_data[:, 1:] = train_data_old
+
+test_data = np.ones((test_data_old.shape[0], test_data_old.shape[1] + 1), dtype=float)
+test_data[:, 1:] = test_data_old
 ###########################
 
 ###### TRAIN ######
@@ -377,7 +389,7 @@ shuffle(idx_list)
 test_data = test_data[idx_list]
 test_labels = test_labels[idx_list]
 
-gradient_check()
+# gradient_check()
 learned_weights_1, learned_weights_2 = train()
 ###################
 
