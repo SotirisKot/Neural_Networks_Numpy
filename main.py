@@ -12,6 +12,8 @@ from matplotlib import pyplot as plt
 random.seed(1997)
 
 
+###### ACTIVATION FUNCTIONS ######
+
 def softplus(a):
     # return np.log(1 + np.exp(a)) this version is not stable for large a...overflows
     return np.log(1 + np.exp(- np.abs(a))) + np.maximum(a, 0)  # numerical stable
@@ -29,7 +31,6 @@ def cos(a):
 
 
 def derivative_softplus(a):
-    # TODO try the other derivative as well
     return 1 / (1 + np.exp(- a))
 
 
@@ -48,7 +49,10 @@ def activation_function(a):
 def derivative_activation_function(a):
     return derivative_function(a)
 
+###################################
 
+
+# calculates the result of the one hidden layer and adds the bias to the result
 def get_hidden_layer_representation(input, weights_1):
     # input : batch_size x (D + 1) , weights_1 : M x (D + 1)
     a = input.dot(weights_1.T)
@@ -63,6 +67,7 @@ def get_hidden_layer_representation(input, weights_1):
     return a_final
 
 
+# the forward pass of our system...it calculates the loss and the softmax probabilities for the K categories
 def forward(input, labels, weights_1, weights_2):
     # pass the input through the hidden layer
     hidden_layer_representation = get_hidden_layer_representation(input, weights_1)
@@ -84,6 +89,8 @@ def forward(input, labels, weights_1, weights_2):
     return loss, output, hidden_layer_representation
 
 
+# this function is used during testing...it does a forward pass without calculating the loss..it returns the softmax
+# probabilities.
 def inference(input, weights_1, weights_2):
     # pass the input through the hidden layer
     hidden_layer_representation = get_hidden_layer_representation(input, weights_1)
@@ -99,6 +106,7 @@ def inference(input, weights_1, weights_2):
     return output
 
 
+# this is the backward pass that calculates the gradients that are used in stochastic gradient ascent
 def backward(labels, output, hidden_layer_rep, weights_1, weights_2, input):
     # gradients for the weights between the hidden layer and the softmax layer
     grad_weights_2 = (labels - output).T.dot(hidden_layer_rep) - lamda * weights_2
@@ -115,6 +123,8 @@ def backward(labels, output, hidden_layer_rep, weights_1, weights_2, input):
     return grad_weights_1, grad_weights_2
 
 
+##### LOSS FUNCTIONS ######
+
 # not vectorized...it will be used for comparison with the vectorized version
 def get_loss(labels, output, weights):
     # first calculate the norm
@@ -127,8 +137,9 @@ def get_loss(labels, output, weights):
     return sum - regularization
 
 
-# vectorized version of the loss function
+# vectorized version of the loss function...performs must faster.
 def get_loss_vectorized(labels, output, weights1, weights2):
+    # these two calculations of the regularization term are the same
     # regularization = (lamda / 2) * (np.power(np.linalg.norm(weights), 2))
     regularization = (lamda / 2) * (np.sum(np.square(weights1)) + np.sum(np.square(weights2)))
     output = np.log(output)
@@ -138,19 +149,17 @@ def get_loss_vectorized(labels, output, weights1, weights2):
     loss = output - regularization
     return loss
 
-
-def get_loss_lab(labels, output, weights1, weights2):
-    pass
+###############################
 
 
-# use by default ax=1, when the array is 2D
-# use ax=0 when the array is 1D
+# softmax function...turns the output to probilities that sum to 1..tends to favor large numbers.
 def softmax(x, ax=1):
     m = np.max(x, axis=ax, keepdims=True)  # max per row
     p = np.exp(x - m)
     return p / np.sum(p, axis=ax, keepdims=True)
 
 
+# a function that yields a batch from the dataset.
 def batch_yielder(data, data_labels):
     for idx in range(0, data.shape[0], batch_size):
         input_b = data[idx:idx + batch_size]
@@ -158,10 +167,18 @@ def batch_yielder(data, data_labels):
         yield input_b, labels_b
 
 
+# the function that trains the model. Initializes the weights based on the normal distribution
+# runs for #epochs, does a forward and a backward pass for each batch updating the weights.
 def train():
+    ####################################
+    # worked best
+    # weights_1 ----> normal distribution with a mean of 0 and standard deviation of 1.
+    # weights_2 ----> zeros
+    ####################################
+
     # initialize the weights
-    # for weights_1 we will use xavier initialization
-    # weights_2 will be initialized to zeros or xavier
+    # for weights_1 we will use xavier initialization or normal distribution
+    # weights_2 will be initialized to zeros or xavier or normal distribution
     # weights_1 = np.random.rand(M, D + 1) * np.sqrt(1 / (D + 1 + M))
     # weights_1[:, 0] = 1.0
     #
@@ -170,7 +187,7 @@ def train():
     # weights_2[:, 0] = 1.0
 
     center = 0
-    s = 1 / np.sqrt(D + 1)
+    s = np.sqrt(1 / (D + 1))
 
     # Initialize the weights
     weights_2 = np.zeros((K, M + 1))
@@ -208,6 +225,7 @@ def train():
     return weights_1, weights_2
 
 
+# a function to test a batch...if does a forward pass for a batch and returns the predictions for it.
 def test_batch():
     # we do forward passes with the learned weights and we predict
     iterator = tqdm(batch_yielder(test_data, test_labels))
@@ -232,12 +250,31 @@ def test_batch():
     print("Accuracy : {}/{} ... {}".format(true, total, float(true / total)))
 
 
+# the test function that was used..it tests the entire test set at once and logs some information.
 def test():
     output = inference(test_data, learned_weights_1, learned_weights_2)
     predictions = np.argmax(output, 1)
-    print('Accuracy : {}'.format(np.mean(predictions == np.argmax(test_labels, 1))))
+    accuracy = np.mean(predictions == np.argmax(test_labels, 1))
+    print('Accuracy : {}'.format(accuracy))
+    print("Writing to file: ")
+    with open('machine_learning_results.txt', 'a') as file:
+        file.write("DATASET: " + " " + dataset)
+        file.write('\n')
+        file.write("HIDDEN_SIZE " + " " + str(M))
+        file.write('\n')
+        file.write("Learning Rate: " + ' ' + str(lr))
+        file.write('\n')
+        file.write("Lamda: " + ' ' + str(lamda))
+        file.write('\n')
+        file.write("Accuracy: " + ' ' + str(accuracy))
+        file.write('\n')
+        file.write("Activation Function: " + ' ' + str(non_linearity))
+        file.write('\n')
+        file.write("######################################################################")
+        file.write('\n')
 
 
+# a function to show an image of the MNIST dataset
 def show_image_mnist(image_data):
     # plot 5 random images from the training set
     n = 100
@@ -256,6 +293,7 @@ def show_image_mnist(image_data):
     plt.show()
 
 
+# a function to show an image of the CIFAR dataset
 def plot_cifar(ind):
     arr = train_data_old[ind]
     R = arr[0:1024].reshape(32, 32)
@@ -271,6 +309,8 @@ def plot_cifar(ind):
     plt.show()
 
 
+# this function performs the gradient check..For an epsilon of 1e-6 the difference must be smaller than that.
+# for the mnist dataset the difference for weights_1 ---> 1e-7 and for weights_2 ---> 1e-10
 def gradient_check():
     epsilon = 1e-6
 
@@ -427,22 +467,109 @@ def load_cifar_10_batch(batch_name, test_bool=False):
     data_batch = cPickle.load(open('/home/sotiris/PycharmProjects/cifar-10-batches-py/{}'.format(batch_name), 'rb'),
                               encoding='latin1')
 
-    # img_data = data_batch['data'][0]
-    # img_filename = data_batch['filenames'][0]
-    # img_label = data_batch['labels'][0]
-    # print(img_data.shape)
-    # print(img_filename)
-    # print(img_label)
-    # exit(0)
     return data_batch
 
 
+# if set to True an image will be plotted
 plot_an_image = False
+
+# if set to True gradient check will be performed
+do_gradient_check = False
+
+
+###### CODE FOR EXPERIMENTS ######
+
+# This part of the code was used for testing different parameters
+# batch_size = 100
+# epochs = 200
+# K = 10
+# datasets = ['CIFAR', 'MNIST']
+# hidden_sizes = [100, 200, 300]
+# activation_functions = [softplus, tanh, cos]
+# lr_s = [0.01, 0.001]
+# lamdas = [0.1, 0.05, 0.01]
+#
+# for dataset in datasets:
+#     if dataset == 'MNIST':
+#         path = '/home/sotiris/PycharmProjects/mnist_data/'
+#         train_data_old, train_labels, test_data_old, test_labels = load_mnist_data()
+#         if plot_an_image:
+#             show_image_mnist(train_data_old)
+#     else:
+#         path = '/home/sotiris/PycharmProjects/cifar_data/'
+#         labels_dict = cPickle.load(
+#             open('/home/sotiris/PycharmProjects/cifar-10-batches-py/{}'.format('batches.meta'), 'rb'))
+#         labels_names = labels_dict['label_names']
+#         train_data_old, train_labels, test_data_old, test_labels = load_cifar_10_data()
+#
+#         # plot a random sample from the train set
+#         if plot_an_image:
+#             ind = np.random.randint(0, 50000)
+#             plot_cifar(ind)
+#
+#     train_data = np.ones((train_data_old.shape[0], train_data_old.shape[1] + 1), dtype=float)
+#     train_data[:, 1:] = train_data_old
+#
+#     test_data = np.ones((test_data_old.shape[0], test_data_old.shape[1] + 1), dtype=float)
+#     test_data[:, 1:] = test_data_old
+#
+#     idx_list = [i for i in range(train_labels.shape[0])]
+#     shuffle(idx_list)
+#     train_data = train_data[idx_list]
+#     train_labels = train_labels[idx_list]
+#     total_batches = train_data.shape[0] // batch_size
+#
+#     D = train_data_old.shape[1]
+#     print(D)
+#     # we must also shuffle the test data
+#     idx_list = [i for i in range(test_labels.shape[0])]
+#     shuffle(idx_list)
+#     test_data = test_data[idx_list]
+#     test_labels = test_labels[idx_list]
+#
+#     for non_linearity in tqdm(activation_functions):
+#
+#         if non_linearity == tanh:
+#             derivative_function = derivative_tanh
+#         elif non_linearity == cos:
+#             derivative_function = derivative_cos
+#         else:
+#             derivative_function = derivative_softplus
+#
+#         for M in hidden_sizes:
+#             for lr in lr_s:
+#                 for lamda in lamdas:
+#                     learned_weights_1, learned_weights_2 = train()
+#                     test()
+
+############## some test code #####################
+# load_mnist_data('/home/sotiris/PycharmProjects/mnist_data/')
+# input = np.array([[1, 2, 3, 6],
+#                   [2, 4, 5, 6],
+#                   [1, 2, 3, 6]])
+# print(input)
+# print(input.shape)
+# input = np.array([13, 46, 79])
+# print(softmax(input))
+# activation_function(1.2)
+# labels = np.array([[0, 0, 0, 1, 0], [0, 0, 0, 0, 1]])
+# output = np.array([[0.05, 0.05, 0.05, 0.8, 0.05], [0.05, 0.05, 0.05, 0.8, 0.05]])
+# weights1 = np.array([[1, 2, 3, 4, 5],
+#                      [1, 2, 3, 4, 5]])
+#
+# weights2 = np.array([[6, 7, 8, 9, 10],
+#                      [1, 2, 3, 4, 5]])
+# weights = np.concatenate((weights1, weights2))
+# print(weights.flatten())
+# print(get_loss(1, 5, labels, output))
+# print(get_loss_vectorized(labels, output, 0.1, weights))
+
+#################################
 
 
 ###### DATASET ######
 
-# the two names are 'MNIST' anc 'CIFAR'
+# the two names are 'MNIST' and 'CIFAR'
 dataset = 'CIFAR'
 
 if dataset == 'MNIST':
@@ -467,17 +594,14 @@ else:
 ###### MODEL PARAMETERS ######
 
 batch_size = 100
-epochs = 200
+epochs = 300
 lr = 0.001
 lamda = 0.1
-M = 100
-
-if dataset == 'CIFAR':
-    D = 3072
-else:
-    D = 784
-
+M = 300
+D = train_data_old.shape[1]
+print(D)
 K = 10
+
 non_linearity = tanh
 derivative_function = derivative_tanh
 
@@ -485,7 +609,7 @@ derivative_function = derivative_tanh
 
 
 ###### CREATE SPLITS ######
-
+# also add the bias.
 train_data = np.ones((train_data_old.shape[0], train_data_old.shape[1] + 1), dtype=float)
 train_data[:, 1:] = train_data_old
 
@@ -509,33 +633,13 @@ shuffle(idx_list)
 test_data = test_data[idx_list]
 test_labels = test_labels[idx_list]
 
-# gradient_check()
-# exit(0)
+if do_gradient_check:
+    print('Performing gradient check...might take some time...')
+    gradient_check()
+
 learned_weights_1, learned_weights_2 = train()
 ###################
 
 ###### EVALUATE ######
 test()
 ######################
-
-
-# load_mnist_data('/home/sotiris/PycharmProjects/mnist_data/')
-# input = np.array([[1, 2, 3, 6],
-#                   [2, 4, 5, 6],
-#                   [1, 2, 3, 6]])
-# print(input)
-# print(input.shape)
-# input = np.array([13, 46, 79])
-# print(softmax(input))
-# activation_function(1.2)
-# labels = np.array([[0, 0, 0, 1, 0], [0, 0, 0, 0, 1]])
-# output = np.array([[0.05, 0.05, 0.05, 0.8, 0.05], [0.05, 0.05, 0.05, 0.8, 0.05]])
-# weights1 = np.array([[1, 2, 3, 4, 5],
-#                      [1, 2, 3, 4, 5]])
-#
-# weights2 = np.array([[6, 7, 8, 9, 10],
-#                      [1, 2, 3, 4, 5]])
-# weights = np.concatenate((weights1, weights2))
-# print(weights.flatten())
-# print(get_loss(1, 5, labels, output))
-# print(get_loss_vectorized(labels, output, 0.1, weights))
