@@ -568,7 +568,7 @@ do_gradient_check = False
 ###### DATASET ######
 
 # the two names are 'MNIST' and 'CIFAR'
-dataset = 'CIFAR'
+dataset = 'MNIST'
 
 if dataset == 'MNIST':
     path = '/home/sotiris/PycharmProjects/mnist_data/'
@@ -592,10 +592,10 @@ else:
 ###### MODEL PARAMETERS ######
 
 batch_size = 100
-epochs = 300
+epochs = 100
 lr = 0.001
 lamda = 0.1
-M = 300
+M = 100
 D = train_data_old.shape[1]
 print(D)
 K = 10
