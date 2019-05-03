@@ -73,7 +73,7 @@ def forward(input, labels, weights_1, weights_2):
     hidden_layer_representation = get_hidden_layer_representation(input, weights_1)
 
     # calculate dot product between weights_2 and hidden layer representation
-    # hidden layer_representation : B x (M + 1)
+    # hidden layer_representation : batch_size x (M + 1)
     # weights_2 : K x (M + 1)
     output = hidden_layer_representation.dot(weights_2.T)
 
