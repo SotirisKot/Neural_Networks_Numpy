@@ -320,7 +320,7 @@ def gradient_check():
     weights_2_tmp[:, 0] = 1.0
 
     # create a fake train batch (of size 8)
-    b_size = 4
+    b_size = 8
     fake_input = train_data[:b_size]
     fake_labels = train_labels[:b_size]
 
