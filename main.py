@@ -191,8 +191,6 @@ def train():
 
     # Initialize the weights
     weights_2 = np.zeros((K, M + 1))
-
-    # We use this in order for our activation function to be more effective
     weights_1 = np.random.normal(center, s, (M, D + 1))
 
     for _ in tqdm(range(epochs)):
