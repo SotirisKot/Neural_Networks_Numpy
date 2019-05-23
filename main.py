@@ -229,7 +229,7 @@ def test_batch():
     iterator = tqdm(batch_yielder(test_data, test_labels))
     true = 0
     total = 0
-    for batch in tqdm(iterator):
+    for batch in iterator:
         input_data = batch[0]
         labels = batch[1]
 
